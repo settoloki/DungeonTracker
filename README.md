@@ -35,8 +35,10 @@ Local run history still works if you skip this; only website progress / sync req
 
 ## Install (release zip)
 
+**Latest download:** [github.com/settoloki/DungeonTracker/releases/latest](https://github.com/settoloki/DungeonTracker/releases/latest)
+
 1. Close Dungeon Helper.
-2. Download `DungeonTracker-0.0.1.zip` from [Releases](https://github.com/settoloki/DungeonTracker/releases).
+2. Download `DungeonTracker-*.zip` from that Releases page (or a specific version tag).
 3. Extract so you have a folder named `DungeonTracker` containing `DungeonTracker.dll`.
 4. Copy that folder to:
 
@@ -46,6 +48,17 @@ Local run history still works if you skip this; only website progress / sync req
 6. (Optional) Register at [ddotracker.zepsu.com](https://ddotracker.zepsu.com/), then sign in from the plugin to sync completions.
 
 Do **not** copy someone else’s `ddotracker-settings.json` or `quest-history.json`.
+
+## Releasing (maintainers)
+
+Pushing a version tag triggers GitHub Actions to build the plugin zip and publish a GitHub Release:
+
+```powershell
+git tag v0.0.2
+git push origin v0.0.2
+```
+
+CI also builds on every push/PR to `main` (no release upload).
 
 ## Build from source
 

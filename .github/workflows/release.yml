@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart("v")
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "zip_name=DungeonTracker-$version.zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Building release $tag ($version)"
+
+      - name: Restore
+        run: dotnet restore src/DungeonTracker/DungeonTracker.csproj
+
+      - name: Build
+        run: >
+          dotnet build src/DungeonTracker/DungeonTracker.csproj
+          -c Release
+          --no-restore
+          -p:DeployOnBuild=false
+          -p:Version=${{ steps.ver.outputs.version }}
+
+      - name: Package plugin zip
+        shell: pwsh
+        run: |
+          $version = "${{ steps.ver.outputs.version }}"
+          $zipName = "${{ steps.ver.outputs.zip_name }}"
+          $outDir = "src/DungeonTracker/bin/Release/net8.0-windows/win-x64"
+          $stage = "artifacts/DungeonTracker"
+          New-Item -ItemType Directory -Path "$stage/Data" -Force | Out-Null
+
+          Copy-Item "$outDir/DungeonTracker.dll" $stage
+          Copy-Item "$outDir/DungeonTracker.deps.json" $stage
+          if (Test-Path "$outDir/DungeonTracker.runtimeconfig.json") {
+            Copy-Item "$outDir/DungeonTracker.runtimeconfig.json" $stage
+          }
+          Copy-Item "$outDir/Data/quests.json" "$stage/Data/quests.json"
+          Copy-Item "$outDir/Data/quests.json" "$stage/quests.json"
+          Copy-Item "README.md" $stage
+
+          @"
+          Dungeon Tracker $version
+
+          Install:
+          1. Close Dungeon Helper.
+          2. Copy this DungeonTracker folder to:
+             %AppData%\Dungeon Helper\plugins\DungeonTracker
+          3. Start Dungeon Helper.
+
+          Register for cloud sync at https://ddotracker.zepsu.com/
+
+          Known issue: challenge difficulty is often Unknown until Dungeon Helper 5.
+          "@ | Set-Content -Path "$stage/INSTALL.txt" -Encoding UTF8
+
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          Compress-Archive -Path $stage -DestinationPath "artifacts/$zipName" -Force
+          Get-Item "artifacts/$zipName" | Format-List FullName, Length
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Dungeon Tracker ${{ steps.ver.outputs.version }} (beta)
+          generate_release_notes: true
+          body: |
+            ## Download
+
+            Install **`${{ steps.ver.outputs.zip_name }}`** below:
+
+            1. Close Dungeon Helper
+            2. Extract the zip into `%AppData%\Dungeon Helper\plugins\DungeonTracker`
+            3. Start Dungeon Helper
+
+            Register for cloud sync at https://ddotracker.zepsu.com/
+
+            ### Known issue — difficulty
+
+            Challenge difficulty (Casual / Normal / Hard / Elite / Reaper) is often **Unknown** with the current Dungeon Helper SDK. This is expected to improve with **Dungeon Helper 5**.
+          files: |
+            artifacts/${{ steps.ver.outputs.zip_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
