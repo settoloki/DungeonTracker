@@ -21,7 +21,17 @@
 - Windows x64
 - [.NET 8](https://dotnet.microsoft.com/download/dotnet/8.0) runtime (for building; Dungeon Helper hosts plugins)
 - [Dungeon Helper](https://dungeonhelper.com/) with VoK.Sdk-compatible plugin support
-- Optional: a [DDO Tracker](https://ddotracker.zepsu.com/) account for cloud sync
+- A free account on **[DDO Quest Tracker](https://ddotracker.zepsu.com/)** if you want cloud sync (local tracking works without it)
+
+## Create a DDO Tracker account
+
+Cloud sync needs a website account:
+
+1. Open **[https://ddotracker.zepsu.com/](https://ddotracker.zepsu.com/)** and register / sign up.
+2. Add your DDO character(s) on the site (name, server, classes, etc.).
+3. In the plugin, open **DDO Tracker** settings, sign in with that account, and select the matching website character.
+
+Local run history still works if you skip this; only website progress / sync requires registration.
 
 ## Install (release zip)
 
@@ -33,6 +43,7 @@
    `%AppData%\Dungeon Helper\plugins\DungeonTracker`
 
 5. Start Dungeon Helper and enable/load **Dungeon Tracker**.
+6. (Optional) Register at [ddotracker.zepsu.com](https://ddotracker.zepsu.com/), then sign in from the plugin to sync completions.
 
 Do **not** copy someone else’s `ddotracker-settings.json` or `quest-history.json`.
 
