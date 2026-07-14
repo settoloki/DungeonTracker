@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Authors>tom</Authors>
+    <Product>Dungeon Tracker</Product>
+    <Version>1.0.0</Version>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <AssemblyName>DungeonTracker</AssemblyName>
+    <RootNamespace>DungeonTracker</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="VoK.Sdk" Version="4.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Data\quests.json" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="Data\quests.json" />
+  </ItemGroup>
+
+  <Target Name="DeployPlugin" AfterTargets="Build" Condition="'$(DeployOnBuild)' != 'false'">
+    <PropertyGroup>
+      <PluginOutput>$(MSBuildProjectDirectory)\..\..\</PluginOutput>
+    </PropertyGroup>
+    <ItemGroup>
+      <DeployFiles Include="$(TargetDir)*.dll;$(TargetDir)*.deps.json;$(TargetDir)*.runtimeconfig.json" />
+      <DeployData Include="$(TargetDir)Data\**\*.*" />
+      <DeployQuestList Include="$(TargetDir)Data\quests.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(PluginOutput)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(DeployData)" DestinationFolder="$(PluginOutput)Data\%(RecursiveDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(DeployQuestList)" DestinationFolder="$(PluginOutput)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

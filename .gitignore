@@ -1,0 +1,49 @@
+# Build
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
+*.dll
+*.pdb
+*.deps.json
+*.runtimeconfig.json
+
+# Runtime / personal data (never ship these)
+**/ddotracker-settings.json
+**/quest-history.json
+**/dungeon-tracker-dev.log
+**/Moonsea/
+**/Orien/
+**/Khyber/
+**/Argonnessen/
+**/Cannith/
+**/Ghallanda/
+**/Sarlona/
+**/Thornwood/
+**/Wayfinder/
+**/Shadowdale/
+**/unknown-server/
+**/unknown-account/
+
+# Local deploy copies at plugin root (built artifacts)
+/DungeonTracker.dll
+/DungeonTracker.deps.json
+/quests.json
+/Data/
+
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.zip
+.idea/
+.vscode/
+
+# Secrets / env
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+secrets.json
