@@ -336,10 +336,11 @@ public static class QuestDifficultyResolver
         if (string.IsNullOrWhiteSpace(questTier))
             return difficulty;
 
+        // Live remake prefixes from volume props are trusted over a Heroic-only catalog guess.
         if (questTier.Equals("Heroic", StringComparison.OrdinalIgnoreCase)
             && (difficulty.Contains("Epic", StringComparison.OrdinalIgnoreCase)
                 || difficulty.Contains("Legendary", StringComparison.OrdinalIgnoreCase)))
-            return "Unknown";
+            return difficulty;
 
         return difficulty;
     }

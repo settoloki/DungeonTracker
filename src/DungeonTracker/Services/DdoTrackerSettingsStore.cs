@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using DungeonTracker.Models;
 
@@ -5,6 +7,8 @@ namespace DungeonTracker.Services;
 
 public sealed class DdoTrackerSettingsStore
 {
+    private const string ProtectedTokenPrefix = "dpapi:";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -50,7 +54,9 @@ public sealed class DdoTrackerSettingsStore
                 return new DdoTrackerSettings();
 
             var json = File.ReadAllText(_settingsPath);
-            return JsonSerializer.Deserialize<DdoTrackerSettings>(json, JsonOptions) ?? new DdoTrackerSettings();
+            var loaded = JsonSerializer.Deserialize<DdoTrackerSettings>(json, JsonOptions) ?? new DdoTrackerSettings();
+            loaded.Token = UnprotectToken(loaded.Token);
+            return loaded;
         }
         catch
         {
@@ -60,7 +66,9 @@ public sealed class DdoTrackerSettingsStore
 
     private void SaveLocked()
     {
-        var json = JsonSerializer.Serialize(_settings, JsonOptions);
+        var toSave = Clone(_settings);
+        toSave.Token = ProtectToken(toSave.Token);
+        var json = JsonSerializer.Serialize(toSave, JsonOptions);
         File.WriteAllText(_settingsPath, json);
     }
 
@@ -88,5 +96,45 @@ public sealed class DdoTrackerSettingsStore
                 })
                 .ToList()
         };
+    }
+
+    private static string? ProtectToken(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return token;
+
+        if (token.StartsWith(ProtectedTokenPrefix, StringComparison.Ordinal))
+            return token;
+
+        try
+        {
+            var bytes = Encoding.UTF8.GetBytes(token);
+            var protectedBytes = ProtectedData.Protect(bytes, optionalEntropy: null, DataProtectionScope.CurrentUser);
+            return ProtectedTokenPrefix + Convert.ToBase64String(protectedBytes);
+        }
+        catch
+        {
+            return token;
+        }
+    }
+
+    private static string? UnprotectToken(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return token;
+
+        if (!token.StartsWith(ProtectedTokenPrefix, StringComparison.Ordinal))
+            return token;
+
+        try
+        {
+            var protectedBytes = Convert.FromBase64String(token[ProtectedTokenPrefix.Length..]);
+            var bytes = ProtectedData.Unprotect(protectedBytes, optionalEntropy: null, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(bytes);
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

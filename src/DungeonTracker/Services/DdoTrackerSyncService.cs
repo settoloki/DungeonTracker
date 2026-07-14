@@ -13,6 +13,7 @@ public sealed class DdoTrackerSyncService : IDisposable
     private readonly string _pluginFolder;
     private readonly DevelopmentLog _devLog;
     private readonly object _lock = new();
+    private readonly SemaphoreSlim _flushGate = new(1, 1);
     private readonly List<DdoTrackerCharacter> _characters = new();
     private QuestCatalog? _questCatalog;
     private bool _busy;
@@ -160,6 +161,7 @@ public sealed class DdoTrackerSyncService : IDisposable
                 settings.UserName = null;
                 settings.SelectedCharacterId = null;
                 settings.SelectedCharacterName = null;
+                settings.Pending.Clear();
             });
 
             lock (_lock)
@@ -343,6 +345,16 @@ public sealed class DdoTrackerSyncService : IDisposable
             return;
         }
 
+        var setting = TryNormalizeApiSetting(record.Difficulty);
+        if (setting == null)
+        {
+            _devLog.Log(
+                "DdoTracker",
+                $"Skipped sync for {record.QuestName}: difficulty \"{record.Difficulty}\" is unknown (will not guess elite)");
+            SetStatus($"DDO Tracker: skipped {record.QuestName} — difficulty unknown");
+            return;
+        }
+
         var characterId = _settings.Snapshot.SelectedCharacterId;
         if (string.IsNullOrWhiteSpace(characterId))
         {
@@ -360,7 +372,7 @@ public sealed class DdoTrackerSyncService : IDisposable
             CharacterId = characterId,
             Name = syncName,
             Difficulty = difficulty,
-            Setting = NormalizeApiSetting(record.Difficulty),
+            Setting = setting,
             DurationSeconds = record.DurationSeconds > 0
                 ? (int)Math.Round(record.DurationSeconds)
                 : null,
@@ -378,13 +390,16 @@ public sealed class DdoTrackerSyncService : IDisposable
         if (!IsSignedIn)
             return;
 
-        var queue = _settings.Snapshot.Pending.ToList();
-        if (queue.Count == 0)
+        if (!await _flushGate.WaitAsync(0).ConfigureAwait(false))
             return;
 
         SetBusy(true);
         try
         {
+            var queue = _settings.Snapshot.Pending.ToList();
+            if (queue.Count == 0)
+                return;
+
             _api.SetBearerToken(_settings.Snapshot.Token);
             var remaining = new List<DdoTrackerPendingCompletion>();
 
@@ -427,37 +442,51 @@ public sealed class DdoTrackerSyncService : IDisposable
         finally
         {
             SetBusy(false);
+            _flushGate.Release();
         }
     }
 
     public static string? NormalizeApiDifficulty(QuestRunRecord record)
     {
-        if (TryNormalizeTier(record.QuestTier, out var fromTier))
-            return fromTier;
-
-        if (record.XpLegendary > 0)
-            return "Legendary";
-        if (record.XpEpic > 0)
-            return "Epic";
-        if (record.XpHeroic > 0)
-            return "Heroic";
-
         var runDiff = record.Difficulty ?? string.Empty;
         if (runDiff.Contains("Legendary", StringComparison.OrdinalIgnoreCase))
             return "Legendary";
         if (runDiff.StartsWith("Epic", StringComparison.OrdinalIgnoreCase))
             return "Epic";
 
+        if (TryNormalizeTier(record.QuestTier, out var fromTier)
+            && (fromTier is "Legendary" or "Epic"))
+            return fromTier;
+
+        // XP can land in Epic/Legendary counters on Heroic runs (potion / VIP side effects).
+        // Prefer catalog QuestTier Heroic when present; only use XP when QuestTier is empty/unknown.
+        if (!TryNormalizeTier(record.QuestTier, out fromTier) || fromTier == "Heroic")
+        {
+            if (fromTier == "Heroic")
+                return "Heroic";
+
+            if (record.XpLegendary > 0)
+                return "Legendary";
+            if (record.XpEpic > 0)
+                return "Epic";
+            if (record.XpHeroic > 0)
+                return "Heroic";
+        }
+
+        if (TryNormalizeTier(record.QuestTier, out fromTier))
+            return fromTier;
+
         return "Heroic";
     }
 
     /// <summary>
     /// Maps in-game challenge labels to API setting: casual|normal|hard|elite|reaper.
+    /// Returns null when difficulty is Unknown so callers can skip sync instead of guessing elite.
     /// </summary>
-    public static string NormalizeApiSetting(string? runDifficulty)
+    public static string? TryNormalizeApiSetting(string? runDifficulty)
     {
-        if (string.IsNullOrWhiteSpace(runDifficulty))
-            return "elite";
+        if (string.IsNullOrWhiteSpace(runDifficulty) || QuestLevelResolver.IsUnknownDifficulty(runDifficulty))
+            return null;
 
         var value = runDifficulty.Trim();
 
@@ -482,7 +511,16 @@ public sealed class DdoTrackerSyncService : IDisposable
             || value.Equals("Legendary Normal", StringComparison.OrdinalIgnoreCase))
             return "normal";
 
-        return "elite";
+        return null;
+    }
+
+    /// <summary>
+    /// Maps in-game challenge labels to API setting: casual|normal|hard|elite|reaper.
+    /// Unknown maps to elite for backwards-compatible callers; prefer <see cref="TryNormalizeApiSetting"/>.
+    /// </summary>
+    public static string NormalizeApiSetting(string? runDifficulty)
+    {
+        return TryNormalizeApiSetting(runDifficulty) ?? "elite";
     }
 
     public void BindToCurrentGameCharacter()
@@ -767,5 +805,6 @@ public sealed class DdoTrackerSyncService : IDisposable
     public void Dispose()
     {
         _api.Dispose();
+        _flushGate.Dispose();
     }
 }

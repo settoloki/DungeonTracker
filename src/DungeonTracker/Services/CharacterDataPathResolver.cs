@@ -66,8 +66,14 @@ public sealed class CharacterDataPathResolver
             return "unknown";
 
         var trimmed = value.Trim();
+        if (trimmed is "." or ".." || trimmed.Contains("..", StringComparison.Ordinal))
+            return "unknown";
+
         var invalid = Path.GetInvalidFileNameChars();
         var sanitized = new string(trimmed.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray());
-        return string.IsNullOrWhiteSpace(sanitized) ? "unknown" : sanitized;
+        if (string.IsNullOrWhiteSpace(sanitized) || sanitized is "." or "..")
+            return "unknown";
+
+        return sanitized;
     }
 }

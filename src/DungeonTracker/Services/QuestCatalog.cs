@@ -182,13 +182,52 @@ public sealed class QuestCatalog
         long xpLegendary,
         int characterLevel = 0)
     {
-        var questTier = QuestLevelResolver.InferQuestTier(xpHeroic, xpEpic, xpLegendary, characterLevel);
+        var questTier = ResolveQuestTier(questName, xpHeroic, xpEpic, xpLegendary, characterLevel, runDifficulty);
         var entry = FindEntry(questName, questTier);
         if (entry == null || entry.Level <= 0)
             return (null, null, questTier);
 
         var effective = QuestLevelResolver.ComputeEffectiveLevel(entry.Level, runDifficulty);
         return (entry.Level, effective, entry.Difficulty);
+    }
+
+    /// <summary>
+    /// Pick Heroic/Epic/Legendary using XP when that remake exists in catalog for this quest.
+    /// Avoids treating Heroic-quest adventure XP in the epic counter as an Epic remake.
+    /// </summary>
+    public string ResolveQuestTier(
+        string questName,
+        long xpHeroic,
+        long xpEpic,
+        long xpLegendary,
+        int characterLevel = 0,
+        string? runDifficulty = null)
+    {
+        List<QuestCatalogEntry> matches;
+        lock (_lock)
+        {
+            var normalized = NormalizeQuestName(questName);
+            matches = string.IsNullOrWhiteSpace(questName)
+                ? new List<QuestCatalogEntry>()
+                : _entries.Where(entry => NamesMatch(entry.Name, normalized)).ToList();
+        }
+
+        bool HasTier(string tier) =>
+            matches.Any(entry => entry.Difficulty.Equals(tier, StringComparison.OrdinalIgnoreCase));
+
+        var remakeHint = runDifficulty ?? string.Empty;
+        if ((xpLegendary > 0 || remakeHint.Contains("Legendary", StringComparison.OrdinalIgnoreCase))
+            && (matches.Count == 0 || HasTier("Legendary")))
+            return "Legendary";
+
+        if ((xpEpic > 0 || remakeHint.StartsWith("Epic", StringComparison.OrdinalIgnoreCase))
+            && HasTier("Epic"))
+            return "Epic";
+
+        if (HasTier("Heroic"))
+            return "Heroic";
+
+        return QuestLevelResolver.InferQuestTier(xpHeroic, xpEpic, xpLegendary, characterLevel);
     }
 
     public string? InferRunDifficultyFromXp(

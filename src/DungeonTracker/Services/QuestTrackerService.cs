@@ -1384,12 +1384,22 @@ public sealed class QuestTrackerService : IDisposable
         var characterLevel = _provider.GetCurrentCharacter()?.PropertyCollection
             ?.GetInt32PropertyValue((uint)DdoProperty.Character_TotalLevel) ?? 0;
 
+        var start = GetRunStartXpSnapshot();
+        var end = XpTracker.Capture(_provider);
+        long xpHeroic = 0, xpEpic = 0, xpLegendary = 0;
+        if (start != null)
+        {
+            xpHeroic = Math.Max(0, end.Heroic - start.Heroic);
+            xpEpic = Math.Max(0, end.Epic - start.Epic);
+            xpLegendary = Math.Max(0, end.Legendary - start.Legendary);
+        }
+
         var (baseLevel, effectiveLevel, questTier) = QuestCatalog.ResolveLevels(
             run.QuestName,
             run.Difficulty,
-            0,
-            0,
-            0,
+            xpHeroic,
+            xpEpic,
+            xpLegendary,
             characterLevel);
 
         var instanceLevel = QuestDifficultyResolver.TryReadInstanceEffectiveLevel(_provider);

@@ -14,12 +14,8 @@ public static class QuestLevelResolver
         if (xpEpic > 0)
             return "Epic";
 
-        if (characterLevel >= 20)
-        {
-            // Epic quests use the Epic row in the catalog even before epic XP is awarded.
-            return "Heroic";
-        }
-
+        // XP buckets are authoritative when present. Character level alone cannot distinguish
+        // Heroic endgame from Epic remakes, so default Heroic until Epic/Legendary XP appears.
         return "Heroic";
     }
 
